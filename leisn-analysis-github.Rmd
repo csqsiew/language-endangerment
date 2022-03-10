@@ -1,0 +1,475 @@
+---
+title: "R code for 'The network nature of language endangerment hotspots'"
+author: ""
+output:
+  html_document:
+    toc: yes
+    df_print: paged
+  pdf_document:
+    toc: yes
+  word_document:
+    toc: yes
+---
+
+*Last updated: 10th March 2022*
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+	message = FALSE,
+	warning = FALSE,
+	include = FALSE
+)
+knitr::opts_chunk$set(message = FALSE)
+knitr::opts_chunk$set(warning = FALSE)
+options(scipen = 99)
+```
+
+```{r libraries, include=FALSE}
+# Run the following code chunk to set up your R environment for the analyses
+
+library(igraph)
+library(tidyverse)
+library(kableExtra)
+library(ggpubr)
+library(multcomp)
+library(ggplot2)
+library(reshape2)
+library(plyr)
+library(ordinal)
+library(MASS)
+library(performance)
+library(sjPlot)
+```
+
+# Description of the database  
+
+The database comprises information obtained with permission from the Catalogue of Endangered Languages (ELCat), that is hosted on the Endangered Languages Project (ELP) platform (https://www.endangeredlanguages.com/). The ELP was first developed and launched by Google, and it is currently overseen by First People’s Cultural Council and the Institute for Language Information and Technology at Eastern Michigan University. Information about the languages in this project is provided by ELCat, which is produced by the University of Hawaiʻi at Mānoa and Eastern Michigan University, with funding provided by the U.S. National Science Foundation (Grants #1058096 and #1057725) and the Luce Foundation. The project is supported by a team of global experts comprising its Governance Council and Advisory Committee.
+
+In general, ELCat aims to present all languages that communities and scholars have pointed out to be at some level of risk as well as languages that have become dormant. In addition to being the largest database of endangered languages globally, ELCat is updated periodically based on feedback gathered from language communities and scholars worldwide. The data therefore represents what was most accurately known at its point of utilization. At the time of usage, there were 3,423 languages represented in ELCat that were determined to be at various levels of risk. Assessment of each language's risk level is carried out using the Language Endangerment Index (LEI), which was developed for ELCat's purposes1. LEI is used to assess the level of endangerment of any given language based on whether there is intergenerational transmission of the language (whether the language is being passed on to younger generations), its absolute number of speakers, speaker number trends (whether numbers are stable, increasing or decreasing), and domains of language use (whether the language is used in a wide number of domains or limited ones). The levels of endangerment that LEI generates include safe, vulnerable, threatened, endangered, severely endangered, and critically endangered. Languages for which it remains unclear if the language has gone extinct or whose last fluent speaker is reported to have died in recent times are referred to as dormant. Given that the focus of ELCat is languages that are at some level of threat, safe languages are excluded from it in general. Where this information is available, each language is also accompanied with its latitudinal and longitudinal coordinates, indicating the location at which it can be found.
+
+## Steps taken to prepare the data for network analysis
+
+The data obtained from ELCat was further organized and cleaned up for analysis.
+
+### Identifier code
+
+Where available, the ISO 639-3 code for each language was utilized as its unique identifier. If not, its LINGUIST List local use code was utilized. These are temporary codes that are not in the currently released ISO 639-3 Standard. For languages with neither, unique 3-letter codes were constructed.
+
+### Endangerment level
+
+Each language’s endangerment level appeared in the same cell with a level of certainty score in the original data file. Both pieces of information were split into separate columns and only endangerment levels were utilized.
+
+For languages where different data were available in ELCat depending on resource utilized, the data was listed in additional columns. The endangerment level data points utilized in these cases were the ones with the most complete and updated information. If there was no data available regarding endangerment level, this information was also reflected.
+
+### Coordinates
+
+Where no exact coordinates were given, coordinates were approximated using Google maps based on the location description provided in the ELCat source e.g. Tel Aviv district, attained from other sources such as Glottolog, UNESCO Atlas of the World’s Languages in Danger, or approximated from maps provided in other sources. ‘NA’ was indicated in the field for coordinates if none could be found.
+
+Coordinates found to be inaccurate were rejected, for example in the instance that coordinates provided indicate a different location than the country the language is supposedly found in. The above steps were then taken to populate the coordinates field.
+
+In instances where a language appears in more than one country, these are listed in separate rows as separate entries. Where there are two sets of coordinates for a country, the set that best corresponds with the written description in the ELP, has greater detail or is more recent, is chosen. Where there are more than two sets of coordinates, a middle point is chosen by plotting all coordinates on MapCustomizer.
+
+### Language family
+
+On ELCat, the information regarding language family may be multi-tiered. For example, Laghuu falls under the Lolo-Burmese branch of the Sino-Tibetan family. For this study, the broader family is utilized, in this case the label ‘Sino-Tibetan’ is used.
+
+Mixed languages, pidgins and creoles have all been categorized as ‘contact languages’. 
+
+Language isolates are listed as ‘isolates’.
+
+### Region 
+
+ELCat groups "Mexico, Central America, Caribbean" together under region. Central America and Caribbean are listed as separate regions here, with Mexico falling under Central America.
+
+# Network construction 
+
+A spatial network of endangered languages was constructed from the database. Each node represented an endangered language, and edges or links depicted the distance between the locations of the languages as specified in the database. A distance matrix containing the distances between all endangered languages was computed by using functions from the `geosphere` R package. Specifically, Haversine distances were computed for each pair of longitude and latitude points in the dataset. Haversine distance refers to the shortest distance between two points on a spherical earth; also referred to as the "great-circle-distance" (Sinnot, 1984).  
+
+Sinnott, R.W, 1984. Virtues of the Haversine. Sky and Telescope 68(2): 159  
+
+## Sensitivity analyses of edge thresholds 
+
+The distance matrix is essentially a fully connected network with weighted, undirected links. Because we wished to capture the strongest or "closest" spatial relationships among the endangered languages, an edge threshold was applied to the distance matrix such that only the edges in the *x_th* lowest percentile were retained in the spatial network. Such an approach allows for the analysis of the most meaningful (i.e., the physically closest) spatial relations in the dataset and how they related to language endangerment status. The edges were then transformed into unweighted connections so a simple unweighted, undirected graph could be readily analyzed using the tools of network science. In order to determine the value of *x* (i.e., the percentile at which to apply the edge threshold), we constructed 10 spatial networks that retained edges with distances below the 1st, 2nd, 3rd... 10th percentile (in increments of 1%) of all distances in the matrix. 
+
+These 10 networks were then analyzed for their macro- and meso-scale network properties. A summary of macro and meso-scale network measures used in this analysis and their definitions is provided in *Table 1*. As seen in *Table 2* below, the 10 networks showed similar patterns in their network structures.          
+
+*Table 1. An overview of macro- and meso-level network measures.*  
+
+| Name of measure | Description |
+|---|---|
+| *V* | number of nodes |
+| *E* | number of edges |
+| network density | the proportion of observed edges / number of possible edges (this corresponds to the threshold, *x*) |
+| average degree, *k* | average number of connections/links/edges each node has |
+| global clustering coefficient, *C* | measure of local clustering (closed triangles) |
+| average shortest path length, *ASPL* | the average length of the shortest path between all possible node pairs in the network |
+| components | number of distinct connected components | 
+| lcc_prop | proportion of nodes in the largest connected component of the network |
+| modularity, *Q* | a meso-level metric quantifying the robustness of community structure (subclusters) of the network |
+
+## Results 
+
+*Table 2. Summary of network characteristics of spatial networks with different edge thresholds.*
+
+```{r macro-analysis}
+foo <- c(1:10)
+table_1 <- matrix(nrow = 10, ncol = 9)
+
+for(i in 1:10) {
+  load(paste0('Workspaces/workspace_threshold_', foo[i], 'pc.RData'))
+
+  # components analysis 
+  cl <- components(g)
+  # community analysis 
+  comm_out <- cluster_louvain(g) # good and fast method for large graphs 
+
+  net_meas <- c(gorder(g), gsize(g), round(edge_density(g), 3), 
+                degree(g) %>% mean() %>% round(1), round(transitivity(g, type = 'global'), 3), 
+                round(mean_distance(g, directed = F), 2),
+    cl$no, # number of connected components 
+    round(max(cl$csize)/gorder(g), 3), # size of the LCC relative to network 
+    modularity(comm_out) %>% round(2)) # modularity 
+  
+  table_1[i,] <- net_meas
+}
+
+table_1 <- as.data.frame(table_1)
+colnames(table_1) <- c('V', 'E', 'density', 'k', 'C', 'ASPL', 'components', 'lcc_prop', 'Q')
+table_1$threshold <- 1:10
+
+table_1 <- table_1 %>%
+  dplyr::select(threshold, everything())
+
+table_1 %>% knitr::kable() %>% 
+    kable_styling(bootstrap_options = c("striped", "condensed"), full_width = F) %>% 
+  as_image('test.png', width = 8)
+```
+
+As expected, network density and average degree of the networks, which serves as indicators of the number of edges relative to the number of nodes in the network, increased as the edge threshold used to connect nodes became more liberal. The relatively high values of C (i.e., high levels of local clustering among nodes) and low values of ASPL (i.e., relatively short paths despite large size of network) suggested the presence of small world structure (Watts and Strogatz, 1998). The community detection analysis using the Louvain method (Blondel et al., 2008) indicated strong evidence of community structure in the networks--suggesting the presence of clusters of endangered languages. 
+
+The point at which the vast majority of nodes was located within the largest connected component of the network occurred at the 5% edge threshold. Because the 5% network was not too fragmented, we report the analyses conducted on the largest connected component of the 5% network in the rest of the Supplementary Materials (i.e., the smaller connected components were excluded), but note that our results are robust across spatial networks of various edge thresholds. 
+
+Watts, D. J., & Strogatz, S. H. (1998). Collective dynamics of ‘small-world’networks. *Nature, 393*(6684), 440-442.
+
+Blondel, V. D., Guillaume, J. L., Lambiotte, R., & Lefebvre, E. (2008). Fast unfolding of communities in large networks. *Journal of Statistical Mechanics: Theory and Experiment, 2008*(10), P10008.
+
+# Macro-level analysis: Assortative mixing of endangerment statuses
+
+```{r load-5pc-net}
+# network
+load('Workspaces/workspace_threshold_5pc.RData')
+rm(list=setdiff(ls(), c("g", "data"))) # only keep g and data
+
+# add status levels as a node attribute 
+foo2 <- data.frame(uuid = V(g)$name) %>% left_join(data, by = 'uuid')
+
+V(g)$status <- foo2$level_number
+```
+
+## Method 
+
+To investigate the macro-level structure of the spatial network of endangered languages, we computed the *assortativity coefficient* of the spatial network. Specifically, we wanted to know if the endangerment statuses of the languages tended to cluster at the global level of the entire network. If the assortativity coefficient were positive, the languages in the network would tend to be connected to languages of similar levels of endangerment. If the assortativity coefficient were negative, the languages in the network would tend to be connected to languages of dissimilar levels of endangerment.  
+
+## Results 
+
+```{r assort}
+# correlation of status labels 
+g_el <- as_edgelist(g)
+g_el <- as.data.frame(g_el)
+
+foo3 <- data %>% dplyr::select(uuid, level_number)
+colnames(foo3) <- c('V1', 'level_number_1')
+g_el <- g_el %>% left_join(foo3, by = 'V1')
+colnames(foo3) <- c('V2', 'level_number_2')
+g_el <- g_el %>% left_join(foo3, by = 'V2')
+
+# use spearman rho for rank correlation
+cor.test(g_el$level_number_1, g_el$level_number_2, method = 's') # r = +0.21, p < .001 
+```
+
+There is a significant positive correlation (Spearman's rank correlation) between the endangerment status of connected pairs of endangered languages in the network, r = 0.21, p < .001. This indicates that languages that are more endangered tend to be connected to (hence, close to) languages that are also more endangered. *Figure 1* below shows a bubble plot of endangerment statuses among spatially close languages: The larger bubbles toward the diagonal as compared to the edges of the plot indicate the presence of positive assortative mixing patterns in the network. 
+
+```{r assort-plot}
+x <- table(g_el$level_number_1, g_el$level_number_2) %>% melt() # basically to make an edgelist with weights from a matrix 
+
+# relabel numbers with labels 
+x$Var1 <- mapvalues(x$Var1, from = c('1', '2', '3', '4', '5', '6'), 
+                to = c('Vulnerable', 'Threatened', 'Endangered', 'Severely Endangered', 
+                                              'Critically Endangered', 'Dormant'), warn_missing = TRUE)
+
+x$Var2 <- mapvalues(x$Var2, from = c('1', '2', '3', '4', '5', '6'), 
+                    to = c('Vulnerable', 'Threatened', 'Endangered', 'Severely Endangered', 
+                           'Critically Endangered', 'Dormant'), warn_missing = TRUE)
+
+# order the factor correctly 
+x$Var1 <- factor(x$Var1, 
+                     levels = c('Vulnerable', 'Threatened', 'Endangered', 'Severely Endangered', 
+                                'Critically Endangered', 'Dormant'))
+x$Var2 <- factor(x$Var2, 
+                 levels = c('Vulnerable', 'Threatened', 'Endangered', 'Severely Endangered', 
+                            'Critically Endangered', 'Dormant'))
+
+# plot bubble map with rotated axis labels 
+ggplot(x, aes(x=Var1, y=Var2, size = value)) +
+  geom_point(alpha=0.7) + xlab('status-x') + ylab('status-y') + theme_minimal() + 
+  theme(axis.text.x = element_text( 
+    angle = 270
+    )
+  )
+
+ggsave(filename = 'Figure1.png', height = 10, width = 10, units = 'cm')
+```
+
+*Figure 1. Bubble plot of endangerment statuses among spatially close languages.*
+
+# Meso-level analysis: Community detection analysis 
+
+Many real world networks from diverse domains have robust community structure (Fortunato, 2010). Broadly speaking, communities are defined as groups of nodes in the network that are more interconnected with each other than with nodes outside of the community (Newman, 2006). Networks with robust community structure will have high values of modularity, *Q*, a network science measure that quantifies the density of connections within and across communities (Newman, 2006). 
+
+Here, we apply the community detection method to our spatial network of endangered languages to investigate the following questions: 
+
+1. Do data-driven approaches such as community detection return "meaningful" communities (groups of endangered languages) that correspond or align with regions identified in previous work? 
+
+2. Are there particular language communities that show more severe endangerment levels? In other words, do more endangered languages tend to cluster around specific communities or are found across all communities in the network? 
+
+Fortunato, S. (2010). Community detection in graphs. *Physics Reports, 486*(3-5), 75-174.
+
+Newman, M. E. (2006). Modularity and community structure in networks. *Proceedings of the National Academy of Sciences, 103*(23), 8577-8582.
+
+## Method 
+
+We apply a community detection algorithm to the largest connected component of the 5% network. The largest connected component (LCC) is the network component containing the largest number of nodes that are connected to each other in a single component. 
+
+Although many community detection methods exist, we used the Louvain method (Blondel et al., 2008) as it is an efficient method that works well for large graphs. The general idea behind this approach is to reassign nodes to communities such that the highest contribution to modularity can be achieved. The reassignment process stops when the modularity of the network cannot be improved further. Specifics of the method can be found in Blondel et al. (2008).  
+
+Blondel, V. D., Guillaume, J. L., Lambiotte, R., & Lefebvre, E. (2008). Fast unfolding of communities in large networks. *Journal of Statistical Mechanics: Theory and Experiment, 2008*(10), P10008.
+
+```{r community-detection}
+# load 5% network
+load('Workspaces/workspace_threshold_5pc.RData')
+
+# extract the LCC 
+cl <- components(g)
+g_lcc <- induced_subgraph(g, cl$membership == which.max(cl$csize))
+
+# community analysis conducted on the LCC 
+set.seed(1) # to reproduce results later 
+comm_out <- cluster_louvain(g_lcc) # good and fast method for large graphs 
+sizes(comm_out) # community sizes
+modularity(comm_out) %>% round(3)
+
+# merge community membership and language status info (the data object) 
+comm_out_results <- data.frame(comm_number = as.vector(membership(comm_out)), uuid = names(membership(comm_out)))
+data_community <- data %>% left_join(comm_out_results, by = 'uuid') 
+```
+
+## Results 
+
+The community detection method returned 13 communities, ranging in size from *11* to *550*. Modularity, Q, was 0.77, indicating high levels of community structure of the network.     
+
+```{r community-table}
+sizes(comm_out) %>% knitr::kable() %>% 
+    kable_styling(bootstrap_options = c("striped", "condensed"), full_width = F) %>% as_image()
+```
+*Table 3. The number of languages categorized into 13 communities.* 
+
+*Figure 2* 
+
+```{r donut-plots}
+# community plots x status - from 20210701.R
+
+working_df <- data_community %>% dplyr::select(comm_number, level_number) %>% na.omit() # only keep community membership and level 
+
+foo2 <- table(working_df$comm_number) %>% data.frame() # list of communities 
+
+for(z in 1:nrow(foo2)) { # for each community 
+
+foo <- working_df %>% filter(comm_number == as.numeric(as.character(foo2$Var1[z]))) # filter by community, then summarize the counts of statuses 
+foo <- table(foo$level_number) %>% as.data.frame()
+colnames(foo) <- c('category', 'count')
+
+# Compute percentages
+foo$fraction = foo$count / sum(foo$count)
+
+# Compute the cumulative percentages (top of each rectangle)
+foo$ymax = cumsum(foo$fraction)
+
+# Compute the bottom of each rectangle
+foo$ymin = c(0, head(foo$ymax, n=-1))
+
+# Make the plot
+ggplot(foo, aes(ymax=ymax, ymin=ymin, xmax=4, xmin=3, fill=category)) +
+  geom_rect() + theme_void() +
+  scale_fill_brewer(palette=5) + ggtitle(paste0('Community ', foo2$Var1[z], '; Size = ', foo2$Freq[z])) + 
+  # palette to darken the more severe groups, include a title with community label and size 
+  coord_polar(theta="y") + # Try to remove that to understand how the chart is built initially
+  xlim(c(2, 4)) # Try to remove that to see how to make a pie chart
+
+ggsave(file = paste0('figures/Community/', foo2$Var1[z], '.png'), width = 3, height = 3) # save plot 
+}
+```
+
+*Note: Donut plots of language endangerment statuses grouped by communities retrieved from the community detection algorithm can be found in the "figures/Community" folder of this codebook's working directory.*
+
+Qualitatively, we observe that these communities correspond well to known or existing language regions. We also observe that certain communities have a much higher proportion of languages that are especially endangered (i.e., darker rings - Communities 13, 12, 9, 5). A more detailed discussion is provided in the main manuscript. 
+
+# Micro-level analysis: The protective value of high closeness centralities 
+
+## Method 
+
+Closeness centrality is a network science measure that measures the "centrality" of nodes in the network. Mathematically, it is the mean of the shortest paths between a target node and all other nodes in the network. Hence it provides a way to measure node importance by considering its distance in relation to other nodes in the network. 
+
+```{r close-prep}
+# use the g_lcc object from the previous section to get closeness centrality values 
+foo4 <- data.frame(uuid = V(g_lcc)$name, closeness = closeness(g_lcc, normalized = T))
+
+# merge with data 
+foo4 <- foo4 %>% left_join(data, by = 'uuid')
+
+# prepare data to conduct a one way anova, IV = labels, DV = closeness
+table(foo4$level) # there are 201 NAs 
+
+foo4 <- foo4 %>% drop_na(level) # remove missing data from analysis (there is a bug here, have to execute twice)
+foo4$level <- factor(foo4$level, 
+                     levels = c('Vulnerable', 'Threatened', 'Endangered', 'Severely Endangered', 
+                                                            'Critically Endangered', 'Dormant'))
+levels(foo4$level) # ensure that level is of factor class 
+
+foo4 <- foo4 %>% drop_na(level) # remove missingness 
+```
+
+```{r close-descriptives}
+# descriptives 
+group_by(foo4, level) %>%
+  dplyr::summarise(
+    count = n(),
+    mean = mean(closeness, na.rm = TRUE) %>% round(4),
+    sd = sd(closeness, na.rm = TRUE) %>% round(4),
+    median = median(closeness, na.rm = TRUE) %>% round(4)
+  ) %>% knitr::kable() %>% 
+    kable_styling(bootstrap_options = c("striped", "condensed"), full_width = F) %>% as_image()
+```
+*Table 3. Means and standard deviations of closeness centrality across languages of different endangerment statuses.*
+
+### ANOVA Results 
+
+```{r close-analysis}
+# Analysis - http://www.sthda.com/english/wiki/one-way-anova-test-in-r 
+res.aov <- aov(closeness ~ level, data = foo4)
+# Summary of the analysis
+summary(res.aov)
+summary(glht(res.aov, linfct = mcp(level = "Tukey"))) # multiple comparisons 
+```
+
+Overall, 1-way ANOVA comparing the closeness centralities of endangered languages across their statuses was statistically significant, F(5,3634) = 12.43, p < .001. Post-hoc multiple comparisons (Tukey's test, with corrected family-wise p-values) were conducted. Overall, this analysis revealed that more endangered languages have lower closeness centralities. In other words, highly endangered languages tend to lie on the periphery of the network whereas languages that are doing better tend to be found in the center of the spatial network (i.e., more centrally located in the network).  
+
+# The relationship between linguistic diversity, spatial network structure, and endangerment status
+
+## Method 
+
+### Definition of linguistic stocks 
+
+A linguistic stock refers to a parent language and all its derived daughter languages, and is thus a unique representation of each language family. A language isolate does not belong to a wider family, but can be considered to be a unique representation of itself, therefore constituting one linguistic stock itself. Contact languages are left out of the count of linguistic stocks, their classification being unclear.
+
+#### Operationalization of linguistic stocks: Based on pre-defined regions in the database
+
+1. Group the languages by **Region** as defined in the Catalogue.
+2. Count the number of unique linguistic families per region. "Isolates", "Contact language", "Unclassified" and "Sign Language" from the count. This value is the linguistic stock of the region and entered into the regression analysis below. 
+
+*Note: This has been done in a separate script and the results are summarized in `additional_data/region-diversity.csv`.*
+
+#### Operationalization of linguistic stocks: Based on community detection results 
+
+1. Group the languages by **Community** based on the output of the community analysis.   
+2. Count the number of *unique* linguistic families per community. "Isolates", "Contact language", "Unclassified" and "Sign Language" were excluded from the count. This value is the linguistic stock of the community and entered into the regression analysis below.  
+
+*Note: This was done in a separate R script and the results are summarized in `additional_data/community5pc-diversity.csv`.*   
+
+We note that these two measures of linguistic stocks are highly positively correlated, r = +.71, p < .001. 
+
+### Description of analyses 
+
+In the subsequent section we constructed ordinal regression models with the following predictors: closeness centrality, as a measure of the structural characteristics of the language in the spatial network, and linguistic stocks coefficient, as a measure of linguistic diversity. The outcome variable is language endangerment status. Due to the ordinal nature of the outcome variable, we used ordinal regression models (i.e., ordered logit generalized linear model). We also compared the two measures of linguistic stocks (one based on pre-defined regions and the other from data-driven communities) to see which measure provided a better fit to the data using model fit statistics.
+
+```{r wrangle}
+# The code chunk below merges the two measures of linguistic diversity into the main data. 
+
+x1 <- read.csv('additional_data/community5pc-diversity.csv') %>% dplyr::select(-X) # data stalks
+x2 <- read.csv('additional_data/region-diversity.csv') %>% dplyr::select(-X) # stalks 
+colnames(x2)[1] <- 'region_clean'
+x3 <- read.csv('additional_data/region_data.csv') %>% dplyr::select(-X) # region data 
+
+data_community_family <- data_community %>% 
+  left_join(x3, by = 'uuid') %>% 
+  left_join(x1, by = 'comm_number') %>% 
+  left_join(x2, by = 'region_clean')
+
+# check correlation
+cor.test(data_community_family$data_stalks, data_community_family$stalks)
+```
+
+```{r network-measures}
+# get micro-level measures (closeness centrality) from the 5pc network 
+# use the g_lcc object from the previous section to get closeness centrality values 
+network_measures <- data.frame(uuid = V(g_lcc)$name,
+                   closeness = closeness(g_lcc, normalized = T))
+
+# merge into the main data 
+data_community_family_network <- data_community_family %>% left_join(network_measures, by = 'uuid')
+```
+
+## Results 
+
+```{r ols-analyses}
+# prepare data for analysis 
+data_community_family_network$level_number2 <- as.factor(data_community_family_network$level_number)
+
+# scale IVs 
+data_community_family_network$closeness_z <- as.vector(scale(data_community_family_network$closeness))
+data_community_family_network$stalks_z <- as.vector(scale(data_community_family_network$stalks))
+data_community_family_network$data_stalks_z <- as.vector(scale(data_community_family_network$data_stalks))
+
+# ordinal regression models 
+ols1 <- clm(level_number2 ~ closeness_z + stalks_z, 
+            data = data_community_family_network, link = "logit")
+
+ols2 <- clm(level_number2 ~ closeness_z + data_stalks_z, 
+            data = data_community_family_network, link = "logit")
+
+compare_performance(ols1, ols2) # ols2 is the better model  
+
+summary(ols2) 
+
+# save point
+save(data_community_family_network, file = 'additional_data/data_community_family_network.RData')
+```
+
+```{r model-performance-table}
+# nice model performance table 
+ols_perform <- compare_performance(ols1, ols2) %>% suppressWarnings() %>% dplyr::rename(R2 = R2_Nagelkerke)
+ols_perform <- ols_perform %>% dplyr::select(Model:R2) %>% dplyr::mutate(R2 = round(R2, 3))
+ols_perform$Model <- c('pre-defined', 'data-driven')
+
+ols_perform %>% knitr::kable() %>% 
+  kable_styling(bootstrap_options = c("striped", "condensed"), full_width = F) %>% as_image()
+```
+*Table 4. Model performance indices for regression models containing the linguistic stocks derived from pre-defined regions (top) and from groups found in the community detection analysis (bottom).*
+
+Model performance indices (see Table 4) indicate that the model containing the linguistic stock coefficient derived from communities of nodes in the spatial network is a better model than the one containing the linguistic stock coefficient derived from pre-defined regions in the Catalogue. 
+
+```{r regression-table}
+# regression parameters 
+tab_model(ols2, show.ci = F, show.stat = T, terms = c("closeness_z", "data_stalks_z"),
+          pred.labels = c('closeness centrality', 'linguistic stocks'),
+          dv.labels = 'endangerment level',
+          string.stat = 'z', file = 'Table6.html')
+
+# first save table to html file
+# tab_model(lme1, file = "plot.html")
+
+# then take this html file and make .png file
+webshot::webshot("Table6.html", "Table6.png")
+```
+*Table 5. Odds ratios for predictors in the model containing linguistic stocks (community-based) and closeness centrality.*
+
+As seen in Table 5, the odds ratio of closeness centrality is less than 1, indicating that greater closeness centralities is associated with lower probabilities of a more severe language endangerment status. Languages that are more centrally positioned have less severe language endangerment statuses. The odds ratio of linguistic stocks is positive, indicating that greater linguistic diversity in the region is associated with higher probabilities of a more severe language endangerment status. 
